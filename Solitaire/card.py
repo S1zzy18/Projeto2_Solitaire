@@ -14,25 +14,20 @@ class Card(ft.GestureDetector):
         self.rank=rank
         self.face_up=False
         self.slot= None
-        self.draggable_pile = [self]
-        self.top= 0
-        self.left= 0
-        self.start_top = 0
-        self.start_left = 0
 
         self.mouse_cursor=ft.MouseCursor.MOVE
         self.drag_interval=5
         self.on_pan_start=self.start_drag
         self.on_pan_update=self.drag
         self.on_pan_end=self.drop
-        #self.on_tap = self.click
-        #self.on_double_tap = self.doubleclick
+        self.on_tap = self.click
+        self.on_double_tap = self.doubleclick
         self.content=ft.Container(
-            bgcolor=ft.Colors.GREEN,
             width= CARD_WIDTH,
             height= CARD_HEIGHT,
             border_radius = ft.border_radius.all(6),
-            content=ft.Image(src="/images/card_back.png")
+            # content=ft.Image(src="/images/card_back.png")
+            content=ft.Image(src=self.solitaire.settings.card_back),
         )
     
     def turn_face_up(self):
@@ -40,71 +35,139 @@ class Card(ft.GestureDetector):
         self.content.content.src = f"/images/{self.rank.name}_{self.suite.name}.svg"
         self.solitaire.update()
 
-    def move_on_top(self):
-        for card in self.draggable_pile:
-            self.solitaire.controls.remove(card)
-            self.solitaire.controls.append(card)
-
-    def bounce_back(self):
-        for card in self.draggable_pile:
-            card.top = card.start_top
-            card.left = card.start_left
+    def turn_face_down(self):
+        self.face_up = False
+        # self.content.content.src=f"/images/card_back.svg"
+        self.content.content.src = self.solitaire.settings.card_back
         self.solitaire.update()
+    
+    def can_be_moved(self):
+        if self.face_up and self.slot.type != "waste":
+            return True
+        if self.slot.type == "waste" and len(
+            self.solitaire.waste.pile
+        ) - 1 == self.solitaire.waste.pile.index(self):
+            return True
+        return False
+
 
     def place(self, slot):
-        for card in self.draggable_pile:
-            if slot in self.solitaire.tableau:
-                card.top = slot.top + len(slot.pile) * CARD_OFFSET
-            else:
-                card.top = slot.top
-                card.left = slot.left
+        self.top = slot.top
+        self.left = slot.left
+        if slot.type == "tableau":
+            self.top += self.solitaire.card_offset * len(slot.pile)
 
-            if card.slot is not None:
-                card.slot.pile.remove(card)
-
-            card.slot = slot
-
-            slot.pile.append(card)
-
-        self.solitaire.update()
-
-    def get_draggable_pile(self):
         if self.slot is not None:
-            self.draggable_pile = self.slot.pile[self.slot.pile.index(self) :]
-        else:
-            self.draggable_pile = [self]
+            self.slot.pile.remove(self)
+
+        self.slot = slot
+
+        slot.pile.append(self)
+        self.solitaire.move_on_top([self])
+        if self.solitaire.check_if_you_won():
+            self.solitaire.on_win()
+        self.solitaire.update()
 
     def start_drag(self, e: ft.DragStartEvent):
-        self.get_draggable_pile()
-        self.move_on_top()
-        self.solitaire.update()
+        if self.can_be_moved():
+            cards_to_drag = self.get_cards_to_move()
+            self.solitaire.move_on_top(cards_to_drag)
+            
+            self.solitaire.current_top = e.control.top
+            self.solitaire.current_left = e.control.left
+            self.solitaire.update()
+
 
     def drag(self, e: ft.DragUpdateEvent):
-        for card in self.draggable_pile:
-            card.top = (
-                max(0, self.top + e.local_delta.y)
-                + self.draggable_pile.index(card) * CARD_OFFSET
-            )
-            card.left = max(0, self.left + e.local_delta.x)
+         if self.can_be_moved():
+            i = 0
+            for card in self.get_cards_to_move():
+                card.top = max(0, self.top + e.local_delta.y)
+                if card.slot.type == "tableau":
+                    card.top += i * self.solitaire.card_offset
+                card.left = max(0, self.left + e.local_delta.x)
+                i += 1
+
             self.solitaire.update()
 
     def drop(self, e: ft.DragEndEvent):
-        for slot in self.solitaire.tableau:
-            if (
-                abs(self.top - (slot.top + len(slot.pile) * CARD_OFFSET))
-                < DROP_PROXIMITY
-                and abs(self.left - slot.left) < DROP_PROXIMITY
-            ):
-                self.place(slot)
-                self.solitaire.update()
-                return
-        for slot in self.solitaire.foundations:
-            if (
-                abs(self.top - slot.top) < DROP_PROXIMITY
-                and abs(self.left - slot.left) < DROP_PROXIMITY
-            ):
-                self.place(slot)
-                self.solitaire.update()
-                return
+        if self.can_be_moved():
+            cards_to_drag = self.get_cards_to_move()
+            slots = self.solitaire.tableau + self.solitaire.foundations
+            
+            for slot in slots:
+                if (
+                    abs(self.top - slot.upper_card_top()) < 40
+                    and abs(self.left - slot.left) < 40
+                ):
+                    if (
+                        slot.type == "tableau"
+                        and self.solitaire.check_tableau_rules(
+                            self, slot.get_top_card()
+                        )
+                    ) or (
+                        slot.type == "foundation"
+                        and len(cards_to_drag) == 1
+                        and self.solitaire.check_foundation_rules(
+                            self, slot.get_top_card()
+                        )
+                    ):
+                        old_slot = self.slot
+                        for card in cards_to_drag:
+                            card.place(slot)
+                            
+                        if len(old_slot.pile) > 0 and old_slot.type == "tableau":
+                            old_slot.get_top_card().turn_face_up()
+                        elif old_slot.type == "waste":
+                            self.solitaire.display_waste()
+                        self.solitaire.update()
 
-        self.bounce_back()
+                        return
+
+            self.solitaire.bounce_back(cards_to_drag)
+            self.solitaire.update()
+
+    def click(self, e):
+        if self.slot.type == "stock":
+            # first, set the current top 3 cards to invisible
+            for card in self.solitaire.waste.get_top_three_cards():
+                card.visible = False
+
+            for i in range(
+                min(self.solitaire.settings.waste_size, len(self.solitaire.stock.pile))
+            ):
+                top_card = self.solitaire.stock.pile[-1]
+                # self.move_on_top(self.solitaire.controls, [top_card])
+                # self.solitaire.move_on_top([top_card])
+                top_card.place(self.solitaire.waste)
+                top_card.turn_face_up()
+            self.solitaire.display_waste()
+            self.solitaire.update()
+
+        if self.slot.type == "tableau":
+            if self.face_up == False and len(
+                self.slot.pile
+            ) - 1 == self.slot.pile.index(self):
+                self.turn_face_up()
+
+    def doubleclick(self, e):
+        if self.slot.type in ("waste", "tableau"):
+            if self.face_up:
+                # self.move_on_top(self.solitaire.controls, [self])
+                self.solitaire.move_on_top([self])
+                old_slot = self.slot
+                for slot in self.solitaire.foundations:
+                    if self.solitaire.check_foundation_rules(self, slot.get_top_card()):
+                        # if True:
+                        self.place(slot)
+                        # if len(old_slot.pile) > 0:
+                        # old_slot.get_top_card().turn_face_up()
+                        # self.solitaire.display_waste()
+                        self.solitaire.update()
+                        return
+                    
+    def get_cards_to_move(self):
+        if self.slot is not None:
+            return self.slot.pile[self.slot.pile.index(self) :]
+
+        return [self]
