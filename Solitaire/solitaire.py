@@ -135,8 +135,24 @@ class Solitaire(ft.Stack):
             i += 1
 
     def display_waste(self):
-        if self.settings.waste_size == 3:
-            self.waste.fan_top_three()
+        for card in self.waste.pile:
+            card.visible = False
+
+        visible_cards = self.waste.get_top_three_cards()
+
+        for i, card in enumerate(visible_cards):
+            card.visible = True
+
+            if card in self.controls:
+                self.controls.remove(card)
+            self.controls.append(card)
+
+            if int(self.settings.waste_size) == 3:
+                card.left = self.waste.left + (i * self.card_offset)
+            else:
+                card.left = self.waste.left
+
+            card.top = self.waste.top
         self.update()
 
     def restart_stock(self):

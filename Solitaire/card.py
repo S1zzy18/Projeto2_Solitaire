@@ -130,19 +130,17 @@ class Card(ft.GestureDetector):
     def click(self, e):
         if self.slot.type == "stock":
             # first, set the current top 3 cards to invisible
-            for card in self.solitaire.waste.get_top_three_cards():
-                card.visible = False
+            num_to_flip = min(self.solitaire.settings.waste_size, len(self.solitaire.stock.pile))
 
-            for i in range(
-                min(self.solitaire.settings.waste_size, len(self.solitaire.stock.pile))
-            ):
-                top_card = self.solitaire.stock.pile[-1]
-                # self.move_on_top(self.solitaire.controls, [top_card])
-                # self.solitaire.move_on_top([top_card])
-                top_card.place(self.solitaire.waste)
-                top_card.turn_face_up()
+            for _ in range(num_to_flip):
+                if len(self.solitaire.stock.pile) > 0:
+                    top_card = self.solitaire.stock.pile[-1]
+                    top_card.place(self.solitaire.waste)
+                    top_card.turn_face_up()
+                    # Ensure it starts as visible before display_waste manages it
+                    top_card.visible = True
+
             self.solitaire.display_waste()
-            self.solitaire.update()
 
         if self.slot.type == "tableau":
             if self.face_up == False and len(
