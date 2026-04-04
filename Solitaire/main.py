@@ -7,11 +7,29 @@
 # ///
 
 import flet as ft
-from solitaire import Solitaire
 from settings import Settings
 from layout import create_appbar
+from solitaire import Solitaire, SOLITAIRE_WIDTH, SOLITAIRE_HEIGHT
 
 def main(page: ft.Page):
+    page.bgcolor = ft.Colors.GREEN_800
+
+    def handle_resize(e):
+        screen_width = page.width
+        screen_height = page.height
+
+        if screen_width and screen_height:
+            available_height = screen_height - 80
+
+            scale_w = screen_width / SOLITAIRE_WIDTH
+            scale_h = available_height / SOLITAIRE_HEIGHT
+
+            scale_factor = min(scale_w, scale_h, 1.0)
+            solitaire.scale = scale_factor
+            
+            solitaire.alignment = ft.Alignment(-1, -1)
+            page.update()
+        
     def on_new_game(settings):
         page.controls.pop()
         new_solitaire = Solitaire(settings, on_win)
@@ -29,6 +47,8 @@ def main(page: ft.Page):
         print("You win")
         page.update()
 
+    page.on_resize = handle_resize
+    
     settings = Settings()
     create_appbar(page, settings, on_new_game)
 

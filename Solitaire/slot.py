@@ -1,6 +1,6 @@
 #Global constants for the slot dimensions
-SLOT_WIDTH = 70
-SLOT_HEIGHT = 100
+SLOT_WIDTH = 100
+SLOT_HEIGHT = 140
 
 import flet as ft
 
@@ -15,7 +15,7 @@ class Slot(ft.Container):
         self.top=top
         self.left=left
         self.border = border
-        self.border_radius = ft.border_radius.all(6)
+        self.border_radius = ft.BorderRadius.all(6)
         self.on_click = self.click
 
     def get_top_card(self):

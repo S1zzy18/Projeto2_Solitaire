@@ -1,6 +1,6 @@
 #Global constants for the card dimensions and drop proximity
-CARD_WIDTH = 70
-CARD_HEIGHT = 100
+CARD_WIDTH = 100
+CARD_HEIGHT = 140
 DROP_PROXIMITY = 30
 CARD_OFFSET = 20
 
@@ -26,7 +26,7 @@ class Card(ft.GestureDetector):
         self.content=ft.Container(
             width= CARD_WIDTH,
             height= CARD_HEIGHT,
-            border_radius = ft.border_radius.all(6),
+            border_radius = ft.BorderRadius.all(6),
             # content=ft.Image(src="/images/card_back.png")
             content=ft.Image(src=self.solitaire.settings.card_back),
         )

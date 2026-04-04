@@ -1,7 +1,7 @@
 #Global constants for the solitaire game
-SOLITAIRE_WIDTH = 1000
-SOLITAIRE_HEIGHT = 500
-CARD_OFFSET = 20
+SOLITAIRE_WIDTH = 900
+SOLITAIRE_HEIGHT = 600
+CARD_OFFSET = 40
 
 import flet as ft
 import random
@@ -26,6 +26,11 @@ class Solitaire(ft.Stack):
         self.controls = []
         self.width = SOLITAIRE_WIDTH
         self.height = SOLITAIRE_HEIGHT
+
+        self.scale = 1.0
+        self.animate_scale = ft.Animation(300, ft.AnimationCurve.DECELERATE)
+        self.clip_behavior = ft.ClipBehavior.NONE
+
         self.current_top = 0
         self.current_left = 0
         self.card_offset = CARD_OFFSET
@@ -70,23 +75,22 @@ class Solitaire(ft.Stack):
                 self.cards.append(Card(solitaire=self, suite=suite, rank=rank))
 
     def create_slots(self):
-
         self.stock = Slot(solitaire=self, slot_type="stock", top=0, left=0, border=ft.Border.all(1))
         self.waste = Slot(solitaire=self, slot_type="waste", top=0, left=100, border=None)
 
         self.foundations = []
 
-        x = 300
+        x = 375
         for i in range(4):
             self.foundations.append(Slot(solitaire=self, slot_type="foundation", top=0, left=x, border=ft.Border.all(1, "outline"),))
-            x += 100
+            x += 125
 
         self.tableau = []
 
         x = 0
         for i in range(7):
-            self.tableau.append(Slot(solitaire=self, slot_type="tableau", top=150, left=x, border=None,))
-            x += 100
+            self.tableau.append(Slot(solitaire=self, slot_type="tableau", top=190, left=x, border=None,))
+            x += 125
 
         self.controls.append(self.stock)
         self.controls.append(self.waste)
