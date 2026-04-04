@@ -1,8 +1,8 @@
 #!uv run
 # /// script
-# requires-python = ">=3.12"
+# requires-python = ">=3.14"
 # dependencies = [
-#     "flet[all]>=0.27.3",
+#     "flet[all]==0.27.3",
 # ]
 # ///
 
@@ -37,4 +37,4 @@ def main(page: ft.Page):
 
     page.on_error = lambda e: print("Page error:", e.data)
 
-ft.run(main, assets_dir="assets")
+ft.app(main, assets_dir="assets")

@@ -82,10 +82,10 @@ class Card(ft.GestureDetector):
          if self.can_be_moved():
             i = 0
             for card in self.get_cards_to_move():
-                card.top = max(0, self.top + e.local_delta.y)
+                card.top = max(0, self.top + e.delta_y)
                 if card.slot.type == "tableau":
                     card.top += i * self.solitaire.card_offset
-                card.left = max(0, self.left + e.local_delta.x)
+                card.left = max(0, self.left + e.delta_x)
                 i += 1
 
             self.solitaire.update()

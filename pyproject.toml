@@ -1,9 +1,9 @@
 [project]
-name = "projeto1-todo-app"
+name = "projeto2-solitaire"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "flet[desktop]>=0.80.5",
+    "flet==0.27.3",
 ]
