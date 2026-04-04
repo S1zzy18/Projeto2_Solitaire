@@ -4,6 +4,7 @@ CARD_HEIGHT = 100
 DROP_PROXIMITY = 30
 CARD_OFFSET = 20
 
+
 import flet as ft
 
 class Card(ft.GestureDetector):
@@ -52,20 +53,23 @@ class Card(ft.GestureDetector):
 
 
     def place(self, slot):
-        self.top = slot.top
-        self.left = slot.left
-        if slot.type == "tableau":
-            self.top += self.solitaire.card_offset * len(slot.pile)
-
         if self.slot is not None:
             self.slot.pile.remove(self)
 
         self.slot = slot
-
         slot.pile.append(self)
+        self.left = slot.left
+        self.top = slot.top
+
+        if slot.type == "tableau":
+            index = slot.pile.index(self)
+            self.top += self.solitaire.card_offset * index
+
         self.solitaire.move_on_top([self])
+
         if self.solitaire.check_if_you_won():
             self.solitaire.on_win()
+        
         self.solitaire.update()
 
     def start_drag(self, e: ft.DragStartEvent):
