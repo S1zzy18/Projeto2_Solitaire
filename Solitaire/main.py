@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.14"
 # dependencies = [
-#     "flet[all]==0.27.3",
+#     "flet[all]>=0.80.5",
 # ]
 # ///
 
@@ -12,6 +12,8 @@ from settings import Settings
 from layout import create_appbar
 
 def main(page: ft.Page):
+    page.theme_mode = ft.ThemeMode.DARK
+    page.web_renderer = ft.WebRenderer.HTML
     def on_new_game(settings):
         page.controls.pop()
         new_solitaire = Solitaire(settings, on_win)
