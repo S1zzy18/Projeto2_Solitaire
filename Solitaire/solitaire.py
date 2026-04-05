@@ -5,6 +5,7 @@ CARD_OFFSET = 40
 
 import flet as ft
 import random
+import json
 
 from card import Card
 from slot import Slot
@@ -85,15 +86,28 @@ class Solitaire(ft.Stack):
 
         x = 375
         for i in range(4):
-            self.foundations.append(Slot(solitaire=self, slot_type="foundation", top=0, left=x, border=ft.Border.all(1, "outline"),))
+            slot = Slot(solitaire=self, slot_type="foundation", top=0, left=x, border=ft.Border.all(1, "outline"),)
+            slot.name = f"foundation_{i}"
+            self.foundations.append(slot)
             x += 125
 
         self.tableau = []
 
         x = 0
         for i in range(7):
-            self.tableau.append(Slot(solitaire=self, slot_type="tableau", top=190, left=x, border=None,))
+            slot = Slot(solitaire=self, slot_type="tableau", top=190, left=x, border=None,)
+            slot.name = f"tableau_{i}"
+            self.tableau.append(slot)
             x += 125
+
+        self.stock.name = "stock"
+        self.waste.name = "waste"
+
+        for i, slot in enumerate(self.foundations):
+            slot.name = f"foundation_{i}"
+
+        for i, slot in enumerate(self.tableau):
+            slot.name = f"tableau_{i}"
 
         self.controls.append(self.stock)
         self.controls.append(self.waste)
@@ -105,9 +119,9 @@ class Solitaire(ft.Stack):
         random.shuffle(self.cards)
         self.original_order = list(self.cards)
         self.controls.extend(self.cards)
+        remaining_cards = list(self.cards)
 
         first_slot = 0
-        remaining_cards = self.cards
 
         while first_slot < len(self.tableau):
             for slot in self.tableau[first_slot:]:
@@ -118,12 +132,12 @@ class Solitaire(ft.Stack):
 
 
         for card in remaining_cards:
-            card.place(self.stock)
+            card.place(self.stock, False)
 
         self.update()
 
         for slot in self.tableau:
-            slot.get_top_card().turn_face_up()
+            slot.get_top_card().turn_face_up(False)
 
         self.update()
 
@@ -235,9 +249,104 @@ class Solitaire(ft.Stack):
         
         self.update()
 
-    def restart_game(self):
+    def restart_game(self, update=True):
         if not self.history:
             return
         while len(self.history) > 0:
             self.undo_move(False)
+        if update:
+            self.update()
+
+    def save_game(self):
+        save_data = {
+            "original_order": [card.id for card in self.original_order],
+            "history": []
+        }
+        for move in self.history:
+            revealed_id = move["revealed"].id if move["revealed"] else None
+            move_data = {
+                "card_ids": [c.id for c in move["cards"]],
+                "from": move["from"].name,
+                "to": move["to"].name,
+                "revealed_id": revealed_id
+            }
+            save_data["history"].append(move_data)
+
+        with open("save_game.json", "w") as f:
+            json.dump(save_data, f, indent=4)
+        print("Game Saved!")
+
+    def load_game(self):
+        try:
+            with open("save_game.json", "r") as f:
+                data = json.load(f)
+        except FileNotFoundError:
+            print("No save found!")
+            return
+        
+        print(f"Current Deck Size: {len(self.cards)}")
+        # print(f"Available IDs: {list(id_map.keys())[:5]}...")
+        
+        id_map = {card.id: card for card in self.cards}
+
+
+        missing_ids = []
+        for card_id in data["original_order"]:
+            clean_id = card_id.strip().lower()
+            if clean_id not in id_map:
+                missing_ids.append(clean_id)
+        
+        if missing_ids:
+            print(f"FATAL ERROR: The following cards are missing from the current deck: {missing_ids}")
+            print(f"First 10 IDs in memory: {list(id_map.keys())[:10]}")
+            return
+
+        self.original_order = [id_map[card_id.strip().lower()] for card_id in data["original_order"]]
+
+        for slot in [self.stock, self.waste] + self.tableau + self.foundations:
+            slot.pile.clear()
+
+        self.history = []
+        temp_cards = list(self.original_order)
+        
+        first_slot = 0
+        while first_slot < len(self.tableau):
+            for slot in self.tableau[first_slot:]:
+                top_card = temp_cards.pop(0)
+                top_card.place(slot, update=False)
+                top_card.turn_face_down() # Reset to face down
+            first_slot += 1
+
+        for card in temp_cards:
+            card.place(self.stock, update=False)
+            card.turn_face_down()
+
+        for slot in self.tableau:
+            if slot.pile:
+                slot.get_top_card().turn_face_up()
+
+        all_slots = {s.name: s for s in [self.stock, self.waste] + self.tableau + self.foundations}
+
+        for move in data["history"]:
+            cards_to_move = [id_map[c_id] for c_id in move["card_ids"]]
+            dest_slot = all_slots[move["to"]]
+            source_slot = all_slots[move["from"]]
+
+            for card in cards_to_move:
+                card.place(dest_slot, False)
+                if dest_slot.type == "waste":
+                    card.turn_face_up()
+                elif dest_slot.type == "stock":
+                    card.turn_face_down()
+
+            revealed_card = None
+            if move["revealed_id"]:
+                revealed_card = id_map[move["revealed_id"]]
+                revealed_card.turn_face_up()
+            self.record_move(cards_to_move, source_slot, dest_slot, revealed_card)
+
+        self.display_waste()
+        self.controls = [self.stock, self.waste] + self.foundations + self.tableau + self.cards
         self.update()
+        print("Game Loaded!")
+        

@@ -16,6 +16,8 @@ class Card(ft.GestureDetector):
         self.face_up=False
         self.slot= None
 
+        self.id = f"{str(suite.name).lower()}_{str(rank.value)}"
+
         self.mouse_cursor=ft.MouseCursor.MOVE
         self.drag_interval=5
         self.on_pan_start=self.start_drag
@@ -31,10 +33,11 @@ class Card(ft.GestureDetector):
             content=ft.Image(src=self.solitaire.settings.card_back),
         )
     
-    def turn_face_up(self):
+    def turn_face_up(self, update=True):
         self.face_up = True
         self.content.content.src = f"/images/{self.rank.name}_{self.suite.name}.svg"
-        self.solitaire.update()
+        if update:
+            self.solitaire.update()
 
     def turn_face_down(self):
         self.face_up = False
