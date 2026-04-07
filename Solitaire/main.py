@@ -109,7 +109,17 @@ def main(page: ft.Page):
         page.appbar.actions[2].on_click = lambda e: solitaire.undo_move()
         page.appbar.actions[3].on_click = lambda e: solitaire.restart_game()
 
-        page.add(solitaire)
+        # Envolve o jogo num ListView para permitir scroll quando não couber na janela
+        game_view = ft.Container(
+            expand=True,
+            content=ft.ListView(
+                controls=[ft.Container(content=solitaire, width=SOLITAIRE_WIDTH, height=SOLITAIRE_HEIGHT)],
+                expand=True,
+                spacing=0,
+                padding=0,
+            ),
+        )
+        page.add(game_view)
         solitaire.start_timer()
         # Forçamos o redimensionamento para aplicar os offsets da plataforma
         handle_resize(None)
@@ -131,7 +141,17 @@ def main(page: ft.Page):
     # Cria a barra de topo (ajusta conforme a tua implementação de layout.py)
     create_appbar(page, settings, on_new_game, solitaire, trigger_bsod)
     
-    page.add(solitaire)
+    # Adiciona o jogo já dentro do view rolável
+    game_view = ft.Container(
+        expand=True,
+        content=ft.ListView(
+            controls=[ft.Container(content=solitaire, width=SOLITAIRE_WIDTH, height=SOLITAIRE_HEIGHT)],
+            expand=True,
+            spacing=0,
+            padding=0,
+        ),
+    )
+    page.add(game_view)
 
     thread = threading.Thread(target=tick_timer, daemon=True)
     thread.start()
