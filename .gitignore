@@ -12,3 +12,6 @@ wheels/
 
 #ficheiros parquet
 *.parquet
+
+#Save file
+save_game.json

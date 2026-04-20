@@ -42,6 +42,11 @@ class Solitaire(ft.Stack):
 
         self.history = []
         self.original_order = []
+
+        self.moves_count = 0
+        self.score = 0
+        self.seconds_elapsed = 0
+        self.timer_running = False
     
     def did_mount(self):
         self.create_card_deck()
@@ -223,6 +228,14 @@ class Solitaire(ft.Stack):
             "revealed": revealed_card 
         }
         self.history.append(move)
+
+        self.moves_count = len(self.history)
+        if destination_slot.type == "foundation":
+            self.update_score(10)
+        elif destination_slot.type == "tableau" and source_slot.type == "waste":
+            self.update_score(5)
+            
+        self.update_stats_display()
         print(f"Move Recorded! History size: {len(self.history)}")
 
     def undo_move(self, update=True):
@@ -247,9 +260,20 @@ class Solitaire(ft.Stack):
         if last_move["from"].type == "waste" or last_move["to"].type == "waste":
             self.display_waste()
         
-        self.update()
+        self.moves_count = len(self.history)
+        self.update_score(-2)
+        self.update_stats_display()
+
+        if update:
+            self.update()
 
     def restart_game(self, update=True):
+        self.seconds_elapsed = 0
+        self.score = 0
+        if not self.history:
+            self.update_stats_display()
+            return
+
         if not self.history:
             return
         while len(self.history) > 0:
@@ -260,7 +284,11 @@ class Solitaire(ft.Stack):
     def save_game(self):
         save_data = {
             "original_order": [card.id for card in self.original_order],
-            "history": []
+            "history": [],
+            "score": self.score,
+            "seconds_elapsed": self.seconds_elapsed,
+            "moves_count": self.moves_count,
+            "deck_passes": self.deck_passes_remaining
         }
         for move in self.history:
             revealed_id = move["revealed"].id if move["revealed"] else None
@@ -280,75 +308,78 @@ class Solitaire(ft.Stack):
         try:
             with open("save_game.json", "r") as f:
                 data = json.load(f)
+        
+            self.score = data.get("score", 0)
+            self.seconds_elapsed = data.get("seconds_elapsed", 0)
+            self.moves_count = data.get("moves_count", 0)
+            self.deck_passes_remaining = data.get("deck_passes", int(self.settings.deck_passes_allowed))
+
+            self.controls.clear()
+            self.update()
+
+            self.create_card_deck()
+            self.create_slots()
+
+            self.original_order = data.get("original_order", [])
+            self.history = []
+            
+            id_map = {card.id: card for card in self.cards}
+            self.original_order = [id_map[card_id.strip().lower()] for card_id in data["original_order"]]
+            slot_map = {s.name: s for s in [self.stock, self.waste] + self.tableau + self.foundations}
+            self.cards = list(self.original_order)
+
+            self.controls.extend(self.cards)
+            remaining_cards = list(self.cards)
+            first_slot = 0
+            while first_slot < len(self.tableau):
+                for slot in self.tableau[first_slot:]:
+                    top_card = remaining_cards.pop(0)
+                    top_card.place(slot, update=False)
+                    top_card.turn_face_down()
+                first_slot += 1
+
+
+            for card in remaining_cards:
+                card.place(self.stock, False)
+            self.update()
+
+            for slot in self.tableau:
+                if slot.pile:
+                    slot.get_top_card().turn_face_up()
+            self.update()
+            
+
+            for move in data.get("history", []):
+                if "card_ids" not in move:
+                    print(f"Skipping a move because it lacks card_ids: {move}")
+                    continue
+                cards_to_move = [id_map[c_id] for c_id in move["card_ids"]]
+                dest_slot = slot_map[move["to"]]
+                source_slot = slot_map[move["from"]]
+                
+                for card in cards_to_move:
+                    card.place(dest_slot, update=False)
+                    if dest_slot.type == "waste": card.turn_face_up()
+                    elif dest_slot.type == "stock": card.turn_face_down()
+
+                revealed_card = None
+                if move["revealed_id"]:
+                    revealed_card = id_map[move["revealed_id"]]
+                    revealed_card.turn_face_up()
+
+                self.record_move(cards_to_move, source_slot, dest_slot, revealed_card)
+
+            self.controls.clear()
+            self.controls.extend([self.stock, self.waste] + self.foundations + self.tableau + self.cards)
+            self.display_waste()
+
+            self.update_stats_display()
+            self.update()
+            print("Game Loaded!")
+            
         except FileNotFoundError:
             print("No save found!")
             return
-        
-        print(f"Current Deck Size: {len(self.cards)}")
-        # print(f"Available IDs: {list(id_map.keys())[:5]}...")
-        
-        id_map = {card.id: card for card in self.cards}
-
-
-        missing_ids = []
-        for card_id in data["original_order"]:
-            clean_id = card_id.strip().lower()
-            if clean_id not in id_map:
-                missing_ids.append(clean_id)
-        
-        if missing_ids:
-            print(f"FATAL ERROR: The following cards are missing from the current deck: {missing_ids}")
-            print(f"First 10 IDs in memory: {list(id_map.keys())[:10]}")
-            return
-
-        self.original_order = [id_map[card_id.strip().lower()] for card_id in data["original_order"]]
-
-        for slot in [self.stock, self.waste] + self.tableau + self.foundations:
-            slot.pile.clear()
-
-        self.history = []
-        temp_cards = list(self.original_order)
-        
-        first_slot = 0
-        while first_slot < len(self.tableau):
-            for slot in self.tableau[first_slot:]:
-                top_card = temp_cards.pop(0)
-                top_card.place(slot, update=False)
-                top_card.turn_face_down() # Reset to face down
-            first_slot += 1
-
-        for card in temp_cards:
-            card.place(self.stock, update=False)
-            card.turn_face_down()
-
-        for slot in self.tableau:
-            if slot.pile:
-                slot.get_top_card().turn_face_up()
-
-        all_slots = {s.name: s for s in [self.stock, self.waste] + self.tableau + self.foundations}
-
-        for move in data["history"]:
-            cards_to_move = [id_map[c_id] for c_id in move["card_ids"]]
-            dest_slot = all_slots[move["to"]]
-            source_slot = all_slots[move["from"]]
-
-            for card in cards_to_move:
-                card.place(dest_slot, False)
-                if dest_slot.type == "waste":
-                    card.turn_face_up()
-                elif dest_slot.type == "stock":
-                    card.turn_face_down()
-
-            revealed_card = None
-            if move["revealed_id"]:
-                revealed_card = id_map[move["revealed_id"]]
-                revealed_card.turn_face_up()
-            self.record_move(cards_to_move, source_slot, dest_slot, revealed_card)
-
-        self.display_waste()
-        self.controls = [self.stock, self.waste] + self.foundations + self.tableau + self.cards
-        self.update()
-        print("Game Loaded!")
 
     def move_to_tableau(self, cards_to_drag, update=True):
         slots = self.solitaire.tableau + self.solitaire.foundations
@@ -388,3 +419,17 @@ class Solitaire(ft.Stack):
 
         self.solitaire.bounce_back(cards_to_drag)
         self.solitaire.update()
+
+    def start_timer(self):
+        self.timer_running = True
+
+    def stop_timer(self):
+        self.timer_running = False
+
+    def update_score(self, points):
+        self.score = max(0, self.score + points)
+        self.update_stats_display()
+
+    def update_stats_display(self):
+        if hasattr(self, "on_stats_change"):
+            self.on_stats_change()

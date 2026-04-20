@@ -1,4 +1,5 @@
 import flet as ft
+import time
 from settings import SettingsDialog
 
 rules_md = ft.Markdown(
@@ -31,9 +32,28 @@ rules_dialog = ft.AlertDialog(
     on_dismiss=lambda e: print("Dialog dismissed!"),
 )
 
-def create_appbar(page, settings, on_new_game, solitaire):
+def create_appbar(page, settings, on_new_game, solitaire, trigger_bsod):
+    solitaire.timer_text = ft.Text("00:00", weight=ft.FontWeight.BOLD)
+    solitaire.score_text = ft.Text("Score: 0", weight=ft.FontWeight.BOLD)
+    solitaire.moves_text = ft.Text("Moves: 0", weight=ft.FontWeight.BOLD)
+
     if rules_dialog not in page.overlay:
         page.overlay.append(rules_dialog)
+
+    click_state = {"count": 0, "last_time": 0}
+
+    def handle_score_click(e):
+        now = time.time()
+        if now - click_state["last_time"] > 0.5:
+            click_state["count"] = 1
+        else:
+            click_state["count"] += 1
+        
+        click_state["last_time"] = now
+
+        if click_state["count"] == 3:
+            trigger_bsod(page, solitaire)
+
     def new_game_clicked(e):
         on_new_game(settings)
 
@@ -49,16 +69,31 @@ def create_appbar(page, settings, on_new_game, solitaire):
         settings_dialog.open = True
         page.update()
 
+    score_clicker = ft.GestureDetector(
+        content=solitaire.score_text,
+        on_tap=handle_score_click,
+    )
+
     page.appbar = ft.AppBar(
         leading=ft.Image(src="/images/card.png"),
         leading_width=30,
         title=ft.Text("Flet solitaire"),
         bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
         actions=[
+            ft.Icon(ft.Icons.TIMER_OUTLINED, size=20),
+            solitaire.timer_text,
+            ft.VerticalDivider(),
+            ft.Icon(ft.Icons.STARS_OUTLINED, size=20),
+            score_clicker,
+            ft.VerticalDivider(),
+            ft.Icon(ft.Icons.LEADERBOARD_OUTLINED, size=20),
+            solitaire.moves_text,
+
             ft.IconButton(icon=ft.Icons.SAVE_OUTLINED, tooltip="Save Game", on_click=lambda e: solitaire.save_game()),
             ft.IconButton(icon=ft.Icons.FILE_OPEN_OUTLINED, tooltip="Load Game", on_click=lambda e: solitaire.load_game()),
             ft.IconButton(icon=ft.Icons.UNDO, on_click=lambda e: solitaire.undo_move(), tooltip="Undo last move"),
             ft.IconButton(icon=ft.Icons.RESTART_ALT, on_click=lambda e: solitaire.restart_game(), tooltip="Restart this deck"),
+            
             ft.TextButton(content="New game", on_click=new_game_clicked),
             ft.TextButton(content="Rules", on_click=show_rules),
             ft.IconButton(ft.Icons.SETTINGS, on_click=show_settings),
